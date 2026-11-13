@@ -1,0 +1,11 @@
+{
+  "name": "ustadha-4am",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "samples": "node scripts/tts.mjs --sample",
+    "voice": "node scripts/tts.mjs --voice",
+    "exercises": "node scripts/exercises.mjs"
+  }
+}
