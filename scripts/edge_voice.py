@@ -30,11 +30,17 @@ async def one(text, out, v=voice):
 async def main():
     os.makedirs(AUDIO, exist_ok=True)
     if "--sample" in args:
-        os.makedirs(os.path.join(ROOT, "samples"), exist_ok=True)
-        s = "مرحباً يا أبنائي. اليوم سنتعلم كيف نحسب القاسم المشترك الأكبر لعددين طبيعيين."
+        SD = os.path.join(ROOT, "public", "samples"); os.makedirs(SD, exist_ok=True)
+        s = "مرحباً يا أبنائي. اليوم سنتعلم كيف نحسب القاسم المشترك الأكبر لعددين طبيعيين، ثم نُبسّط الكسر حتى يصبح غير قابل للاختزال."
+        rows = []
         for v in FEMALE:
-            ok = await one(s, os.path.join(ROOT, "samples", v + ".mp3"), v)
-            print(("✓ " if ok else "✗ ") + v)
+            for r in ["-10%", "+0%"]:
+                f = v + ("_slow" if r.startswith("-") else "") + ".mp3"
+                global rate; rate = r
+                ok = await one(s, os.path.join(SD, f), v)
+                print(("✓ " if ok else "✗ ") + f)
+                if ok: rows.append(f'<p><b dir="ltr">{v}</b> {"(أبطأ)" if r.startswith("-") else "(عادي)"}<br><audio controls preload="none" src="{f}"></audio></p>')
+        open(os.path.join(SD, "index.html"), "w", encoding="utf-8").write('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body dir="rtl" style="font-family:sans-serif;padding:16px"><h2>اختر صوت الأستاذة</h2>' + "".join(rows) + '</body>')
         print("استمع إلى الملفات في مجلد samples ثم اختر الصوت."); return
     mp = os.path.join(AUDIO, "manifest.json")
     man = json.load(open(mp, encoding="utf-8")) if os.path.exists(mp) else {"voice": voice, "files": {}}
