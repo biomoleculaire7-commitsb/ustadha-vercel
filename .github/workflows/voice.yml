@@ -1,5 +1,21 @@
+
 name: voice
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "samples = عينات للاستماع ، all = توليد كل الدروس"
+        type: choice
+        options: [samples, all]
+        default: samples
+      voice:
+        description: "اسم الصوت"
+        type: choice
+        options: [ar-SA-ZariyahNeural, ar-EG-SalmaNeural, ar-AE-FatimaNeural, ar-DZ-AminaNeural, ar-MA-MounaNeural, ar-JO-SanaNeural, ar-LB-LaylaNeural, ar-QA-AmalNeural, ar-SY-AmanyNeural]
+        default: ar-EG-SalmaNeural
+      rate:
+        description: "السرعة (-10% أبطأ)"
+        default: "-10%"
 permissions:
   contents: write
 jobs:
@@ -12,10 +28,13 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install edge-tts
-      - run: python scripts/edge_voice.py
+      - if: inputs.mode == 'samples'
+        run: python scripts/edge_voice.py --sample
+      - if: inputs.mode == 'all'
+        run: python scripts/edge_voice.py --voice "${{ inputs.voice }}" --rate "${{ inputs.rate }}"
       - run: |
           git config user.name "voice-bot"
           git config user.email "voice-bot@users.noreply.github.com"
-          git add public/audio
+          git add public/audio public/samples 2>/dev/null || true
           git commit -m "voice" || echo "nothing"
           git push
