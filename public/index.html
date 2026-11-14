@@ -893,7 +893,7 @@ async function speak(text, tk){
       const f = h && audioManifest && audioManifest.files && audioManifest.files[h];
       if (f){
         await new Promise(res => {
-          const a = new Audio("audio/" + f); curAudio = a; a.playbackRate = speed;
+          const a = new Audio("audio/" + f + "?v=" + encodeURIComponent(audioManifest.voice || "")); curAudio = a; a.playbackRate = speed;
           a.onended = res; a.onerror = res; a.onpause = () => { if (!a.ended) res(); };
           a.play().catch(res);
         });
@@ -1226,5 +1226,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
+<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v1.4</div>
 </body>
 </html>
