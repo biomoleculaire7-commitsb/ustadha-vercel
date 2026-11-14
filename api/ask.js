@@ -21,7 +21,7 @@ async function callModel(prompt) {
   const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent", {
     method: "POST",
     headers: { "x-goog-api-key": gkey, "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 4000 } }),
+    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 12000 } }),
   });
   if (!r.ok) throw new Error("Gemini " + r.status + ": " + (await r.text()).slice(0, 300));
   const j = await r.json();
