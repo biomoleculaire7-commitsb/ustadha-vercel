@@ -9,7 +9,7 @@ on:
         options: [samples, all]
         default: samples
       voice:
-        description: "اسم الصوت"
+        description: "ar-DZ-AminaNeural"
         type: choice
         options: [ar-SA-ZariyahNeural, ar-EG-SalmaNeural, ar-AE-FatimaNeural, ar-DZ-AminaNeural, ar-MA-MounaNeural, ar-JO-SanaNeural, ar-LB-LaylaNeural, ar-QA-AmalNeural, ar-SY-AmanyNeural]
         default: ar-EG-SalmaNeural
