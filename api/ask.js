@@ -17,18 +17,29 @@ async function callModel(prompt) {
     const j = await r.json();
     return (j.content || []).map(c => c.text || "").join("");
   }
-  const vertex = process.env.GEMINI_VERTEX === "1"; // مفاتيح AI Studio الجديدة تبدأ بـ AQ. وتعمل مع الرابط العادي
-  const m = process.env.GEMINI_MODEL || (vertex ? "gemini-2.5-flash" : "gemini-flash-latest");
-  const url = vertex ? "https://aiplatform.googleapis.com/v1/publishers/google/models/" + m + ":generateContent"
-                     : "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
-  const r = await fetch(url + "?key=" + encodeURIComponent(gkey), {
-    method: "POST",
-    headers: { "x-goog-api-key": gkey, "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 12000 } }),
-  });
-  if (!r.ok) throw new Error("Gemini " + r.status + ": " + (await r.text()).slice(0, 300));
-  const j = await r.json();
-  return ((((j.candidates || [])[0] || {}).content || {}).parts || []).map(p => p.text || "").join("");
+  const vertex = process.env.GEMINI_VERTEX === "1";
+  const models = [...new Set([process.env.GEMINI_MODEL || "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.5-flash-lite"])];
+  let last = "";
+  for (const m of models) {
+    for (let k = 0; k < 2; k++) {
+      const url = vertex ? "https://aiplatform.googleapis.com/v1/publishers/google/models/" + m + ":generateContent"
+                         : "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
+      const r = await fetch(url + "?key=" + encodeURIComponent(gkey), {
+        method: "POST",
+        headers: { "x-goog-api-key": gkey, "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 12000 } }),
+      });
+      if (r.ok) {
+        const j = await r.json();
+        return ((((j.candidates || [])[0] || {}).content || {}).parts || []).map(p => p.text || "").join("");
+      }
+      last = "Gemini " + m + " " + r.status + ": " + (await r.text()).slice(0, 200);
+      if (r.status === 503 || r.status === 429 || r.status === 500) { if (k === 0) { await new Promise(z => setTimeout(z, 1500)); continue; } break; }
+      if (r.status === 404) break;           // النموذج غير موجود: جرّب التالي
+      throw new Error(last);                  // خطأ في المفتاح أو الطلب
+    }
+  }
+  throw new Error(last);
 }
 const hits = new Map(); let day = "", dayCount = 0;
 
