@@ -990,7 +990,7 @@ ${FORMAT}`;
     let v;
     if (sample) v = await askJSON(prompt, "default");
     else {
-      const r = await fetch("api/ask", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({title: lesson.title, board: boardText, question: q})});
+      const r = await fetch("api/ask", {method:"POST", headers:{"content-type":"application/json", authorization: "Bearer " + ((JSON.parse(localStorage.getItem("ustadha_auth")||"{}")).token||"")}, body: JSON.stringify({title: lesson.title, board: boardText, question: q})});
       if (r.status === 429) throw {code:"rate_limited"};
       if (!r.ok) throw new Error("http " + r.status);
       v = await r.json();
@@ -1000,7 +1000,7 @@ ${FORMAT}`;
     for (const s of ans.steps){ if (tk.dead) break; if (s.t === "clear" || s.t === "stage" || s.t === "info") continue; await doStep(s, tk); await wait(300/speed); }
     if (!tk.dead && !pendingReveal) sayEl.textContent = wasPlaying || idx > 0 ? "هل اتضح الأمر؟ اضغط «متابعة» لنكمل الدرس." : "هل اتضح الأمر؟ اضغط «ابدأ الدرس».";
   } catch(e){
-    showErr(e && e.code === "rate_limited" ? "طلبات كثيرة. انتظر قليلاً ثم أعد السؤال." : "تعذّرت الإجابة الآن. أعد المحاولة.");
+    showErr(e && e.code === "rate_limited" ? "وصلتَ إلى حد الأسئلة لهذا اليوم. عُد غداً إن شاء الله 🌙" : "تعذّرت الإجابة الآن. أعد المحاولة.");
   }
   $("#askBtn").disabled = false; updateBtns();
 }
