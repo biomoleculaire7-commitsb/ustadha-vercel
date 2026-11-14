@@ -17,8 +17,11 @@ async function callModel(prompt) {
     const j = await r.json();
     return (j.content || []).map(c => c.text || "").join("");
   }
-  const m = process.env.GEMINI_MODEL || "gemini-flash-latest";
-  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent", {
+  const vertex = gkey.startsWith("AQ."); // مفاتيح Vertex AI (express) تبدأ بـ AQ.
+  const m = process.env.GEMINI_MODEL || (vertex ? "gemini-2.5-flash" : "gemini-flash-latest");
+  const url = vertex ? "https://aiplatform.googleapis.com/v1/publishers/google/models/" + m + ":generateContent"
+                     : "https://generativelanguage.googleapis.com/v1beta/models/" + m + ":generateContent";
+  const r = await fetch(url, {
     method: "POST",
     headers: { "x-goog-api-key": gkey, "content-type": "application/json" },
     body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 12000 } }),
