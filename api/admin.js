@@ -29,15 +29,16 @@ export default async function handler(req, res) {
   const id = String(b.id || "").replace(/\D/g, "");
   if (id.length !== 16) return res.status(400).json({ error: "id" });
   let st = await getStudent(id);
+  const plan = b.plan === "paid" ? "paid" : b.plan === "free" ? "free" : undefined;
 
   if (b.action === "add") {
     const nom = String(b.nom || "").trim(), prenom = String(b.prenom || "").trim();
     if (!nom || !prenom) return res.status(400).json({ error: "names" });
-    st = { ...(st || { created: Date.now() }), id, nom, prenom, status: b.until ? "active" : "pending", until: b.until || null };
+    st = { ...(st || { created: Date.now() }), id, nom, prenom, status: b.until ? "active" : "pending", until: b.until || null, ...(plan ? { plan } : {}) };
     await putStudent(st); return res.status(200).json({ ok: true, student: st });
   }
   if (!st) return res.status(404).json({ error: "notfound" });
-  if (b.action === "activate") { st.status = "active"; st.until = b.until || null; st.activated = Date.now(); }
+  if (b.action === "activate") { st.status = "active"; st.until = b.until || null; st.activated = Date.now(); if (plan) st.plan = plan; }
   else if (b.action === "disable") st.status = "disabled";
   else if (b.action === "edit") { if (b.nom) st.nom = String(b.nom).trim(); if (b.prenom) st.prenom = String(b.prenom).trim(); }
   else if (b.action === "delete") { await redis("DEL", "student:" + id); await redis("SREM", "students", id); return res.status(200).json({ ok: true }); }
