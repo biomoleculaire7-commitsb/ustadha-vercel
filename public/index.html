@@ -90,7 +90,7 @@
   .tools{display:flex;gap:8px;margin-top:8px}
   .tools button{flex:1;border:none;border-radius:12px;padding:11px 8px;font-weight:700;font-size:14.5px;color:#fff}
   #exBtn{background:#c47a12} #corrBtn{background:#2f7fc1}
-  #panel{position:fixed;inset:0;background:rgba(15,25,20,.55);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  #panel{position:fixed;inset:0;background:rgba(15,25,20,.55);z-index:90;display:flex;align-items:flex-end;justify-content:center}
   .sheet{background:var(--bg);width:100%;max-width:760px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;box-shadow:0 -6px 24px rgba(0,0,0,.25)}
   @media(min-width:700px){#panel{align-items:center}.sheet{border-radius:18px}}
   .sheet-h{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e3ddd0;font-size:16px}
@@ -142,6 +142,7 @@
   #gate .msg.bad{display:block;background:#fde8e6;color:#b3261e}
   .userbar{display:flex;align-items:center;gap:8px;justify-content:space-between;margin:10px 0 0;font-size:14px;color:var(--muted)}
   .userbar button{border:none;background:#fff;border-radius:10px;padding:7px 12px;font-family:inherit;font-size:13.5px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .userbar{flex-wrap:wrap}.userbar>span:first-child{flex:1 1 100%}.userbar>span:last-child{display:flex;gap:6px;flex-wrap:wrap}.userbar .install{margin-top:0}
   .install{display:none;margin-top:10px;border:none;border-radius:12px;padding:10px 16px;background:#fff;color:var(--accent);font-weight:700;font-size:15px;font-family:inherit}
   .install.show{display:inline-block}
   #iosTip{display:none;font-size:13.5px;line-height:1.7;margin-top:8px;opacity:.95}
@@ -211,7 +212,7 @@
       <p>رياضيات السنة الرابعة متوسط. أستاذتك الذكية تشرح لك الدرس على السبورة خطوة بخطوة، وتحضّر لك تمارين ووضعيات على نمط الاختبارات مع حلولها.</p>
     </div>
   </div>
-  <div class="userbar"><span id="who"></span><span><button id="installBtn" class="install">📲 تثبيت التطبيق</button> <button id="logoutBtn">خروج</button></span></div>
+  <div class="userbar"><span id="who"></span><span><button id="payBtn" class="install show">💳 الاشتراك</button> <button id="installBtn" class="install">📲 تثبيت التطبيق</button> <button id="logoutBtn">خروج</button></span></div>
   <div id="iosTip">📲 لتثبيت التطبيق على iPhone: اضغط زر المشاركة <b>⬆</b> في Safari ثم «إضافة إلى الشاشة الرئيسية».</div>
   <div id="terms"></div>
   <p class="note">الدروس مرتبة حسب التدرج السنوي الرسمي للسنة الرابعة متوسط (2026/2027). الدروس المعلّمة «جاهز» محضّرة مسبقاً، وكل الدروس تتبع تقنية المذكرة: التهيئة ← بناء التعلمات (الوضعية التعلمية ← الحوصلة) ← إعادة الاستثمار. والباقي تحضّره الأستاذة بالذكاء الاصطناعي عند فتحه.</p>
@@ -273,6 +274,7 @@
       <button id="gBtn" type="submit">دخول</button>
     </form>
     <div class="msg" id="gMsg"></div>
+    <button id="payBtn2" class="install show" type="button" style="width:100%;border:1px solid #e9d9a8;margin-bottom:8px">💳 كيفية الاشتراك</button>
     <button id="installBtn2" class="install" type="button" style="width:100%;border:1px solid #cfe9d9">📲 تثبيت التطبيق على الهاتف</button>
   </div>
 </div>
@@ -537,6 +539,7 @@ async function loadLessons(){
     let trialTxt = "";
     if (a.plan === "trial" && a.until){ const d = Math.max(0, Math.ceil((a.until - Date.now()) / 864e5)); trialTxt = ` <span class="trial">⏳ تجربة مجانية: باقي ${d} ${d === 1 ? "يوم" : d === 2 ? "يومان" : d <= 10 ? "أيام" : "يوماً"}</span>`; }
     $("#who").innerHTML = "👋 " + esc((a.prenom || "") + " " + (a.nom || "")) + trialTxt;
+    $("#payBtn").classList.toggle("show", a.plan === "trial");
     hideGate(); renderHome(); return true;
   } catch(e){
     showGate(); gateMsg("bad", "لا يوجد اتصال بالإنترنت. أعد المحاولة."); return false;
@@ -574,8 +577,25 @@ loadLessons();
 let deferredPrompt = null;
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; if (!standalone) ["#installBtn","#installBtn2"].forEach(x => $(x).classList.add("show")); });
-async function doInstall(){ if (!deferredPrompt) return; deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch(e){} deferredPrompt = null; ["#installBtn","#installBtn2"].forEach(x => $(x).classList.remove("show")); }
+// زر التثبيت يظهر دائماً (إلا إذا كان التطبيق مثبتاً)، وإذا لم يسمح المتصفح بالتثبيت المباشر نعرض الطريقة يدوياً
+if (!standalone) ["#installBtn","#installBtn2"].forEach(x => $(x).classList.add("show"));
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; });
+window.addEventListener("appinstalled", () => ["#installBtn","#installBtn2"].forEach(x => $(x).classList.remove("show")));
+async function doInstall(){
+  if (deferredPrompt){ deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch(e){} deferredPrompt = null; return; }
+  const ua = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(ua), inApp = /FBAN|FBAV|Instagram|WhatsApp|Messenger|Line\//i.test(ua);
+  let h = "";
+  if (inApp) h = `<p>⚠️ أنت تفتح الموقع من داخل تطبيق (فيسبوك أو واتساب...). افتحه أولاً في <b>${ios ? "Safari" : "Chrome"}</b>: اضغط ⋮ أو ⋯ ثم «فتح في المتصفح».</p>`;
+  if (ios) h += `<ol><li>افتح الموقع في <b>Safari</b>.</li><li>اضغط زر المشاركة <b>⬆</b> في الأسفل.</li><li>اختر <b>«إضافة إلى الشاشة الرئيسية»</b> ثم «إضافة».</li></ol>`;
+  else h += `<ol><li>افتح الموقع في <b>Google Chrome</b>.</li><li>اضغط القائمة <b>⋮</b> في أعلى اليمين.</li><li>اختر <b>«تثبيت التطبيق»</b> أو <b>«إضافة إلى الشاشة الرئيسية»</b>.</li><li>ستظهر أيقونة «الأستاذة» مع تطبيقات هاتفك.</li></ol>`;
+  openPanel("📲 تثبيت التطبيق", h);
+}
+let PAYINFO = null;
+async function showPay(){
+  if (PAYINFO === null){ try { const r = await fetch("api/login"); PAYINFO = (await r.json()).pay || ""; } catch(e){ PAYINFO = ""; } }
+  openPanel("💳 الاشتراك", PAYINFO ? `<p style="white-space:pre-line;line-height:2">${esc(PAYINFO)}</p><p class="muted">بعد الدفع يُفعَّل حسابك برقمك المدرسي، وتدخل بنفس المعلومات.</p>` : `<p>اتصل بأستاذك لمعرفة طريقة الاشتراك.</p>`);
+}
+$("#payBtn").onclick = showPay; $("#payBtn2").onclick = showPay;
 $("#installBtn").onclick = doInstall; $("#installBtn2").onclick = doInstall;
 if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) $("#iosTip").style.display = "block";
 (async () => { try { tts = await claude.use("tts"); } catch(e){} })();
@@ -1260,6 +1280,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v1.9</div>
+<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v2.0</div>
 </body>
 </html>
