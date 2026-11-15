@@ -40,6 +40,8 @@
                display:flex;flex-direction:column;gap:6px;transition:transform .15s, box-shadow .15s}
   .lesson-card:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,.08)}
   .lesson-card .n{font-size:12px;color:var(--muted)}
+  .trial{background:#fff3cd;color:#7a5a00;border-radius:8px;padding:2px 8px;font-size:13px;margin-inline-start:6px}
+  .exam-card{border-color:#c9b37a;background:#fffaf0}
   .lesson-card .t{font-weight:700;font-size:15.5px;line-height:1.5}
   .badge{align-self:flex-start;font-size:12px;border-radius:999px;padding:2px 9px}
   .badge.ready{background:#e2f5ea;color:#16683f}
@@ -95,6 +97,7 @@
   .sheet-h button{border:none;background:#fff;border-radius:10px;padding:6px 12px;font-size:16px}
   .sheet-b{overflow-y:auto;padding:14px 16px 26px;line-height:1.8}
   .sheet-b .m{font-family:"Patrick Hand",cursive;direction:ltr;unicode-bidi:isolate;display:inline-block;font-size:1.12em;color:#123}
+  #pBody .m{direction:ltr;unicode-bidi:isolate;display:inline-block;max-width:100%;font-weight:600;color:#123;white-space:normal}
   .opt-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .opt-row select,.opt-row button,.c-in textarea{font-family:inherit;font-size:14.5px;border-radius:10px;border:1px solid #d9d2c4;padding:8px 10px;background:#fff}
   .go{background:var(--accent)!important;color:#fff;border:none!important;font-weight:700}
@@ -248,7 +251,7 @@
     <button id="askBtn">اسأل ✋</button>
   </div>
   <div class="tools" id="toolsRow">
-    <button id="exBtn">📝 تمارين ووضعيات</button>
+    <button id="exBtn">📝 أعمال موجهة</button>
   </div>
   <div class="err hidden" id="err"></div>
 </section>
@@ -488,6 +491,7 @@ const $ = s => document.querySelector(s);
 const board = $("#board"), sayEl = $("#say"), teacherEl = $("#teacher");
 let sample = null, tts = null;
 /* ---- النسخة المستقلة (Vercel): صوت مسجل + بنك تمارين + خادم اختياري ---- */
+let TDB = {}, EXAMS = [];
 let audioManifest = null, exBank = null, remoteAsk = false, curAudio = null;
 (async () => { try { const r = await fetch("audio/manifest.json", {cache:"no-cache"}); if (r.ok) { audioManifest = await r.json(); fillVoiceSel(); } } catch(e){} })();
 (async () => { try { const r = await fetch("exercises.json", {cache:"no-cache"}); if (r.ok) { exBank = await r.json(); updateAsk(); } } catch(e){} })();
@@ -510,7 +514,7 @@ let pendingReveal = null;
 const AUTH_KEY = "ustadha_auth";
 function getAuth(){ try { return JSON.parse(localStorage.getItem(AUTH_KEY) || "null"); } catch(e){ return null; } }
 function setAuth(a){ try { a ? localStorage.setItem(AUTH_KEY, JSON.stringify(a)) : localStorage.removeItem(AUTH_KEY); } catch(e){} }
-function gateMsg(kind, text){ const m = $("#gMsg"); m.className = "msg " + kind; m.textContent = text; }
+function gateMsg(kind, text){ const m = $("#gMsg"); m.className = "msg " + kind; m.textContent = text; m.style.whiteSpace = "pre-line"; }
 function showGate(){ $("#gate").classList.remove("hidden"); }
 function hideGate(){ $("#gate").classList.add("hidden"); }
 
@@ -529,7 +533,10 @@ async function loadLessons(){
     if (!r.ok){ showGate(); gateMsg("bad", r.status === 503 ? "الخادم غير مُعدّ بعد (قاعدة البيانات). أخبر أستاذك." : "تعذّر تحميل الدروس. تحقق من الإنترنت ثم أعد المحاولة."); return false; }
     const code = await r.text();
     READY = new Function("PLOT", "DIV", code)(PLOT, DIV);
-    $("#who").textContent = "👋 " + (a.prenom || "") + " " + (a.nom || "");
+    try { const rb = await fetch("api/bank", { headers: { authorization: "Bearer " + a.token } }); if (rb.ok){ const B = await rb.json(); TDB = B.td || {}; EXAMS = B.exams || []; } } catch(e){}
+    let trialTxt = "";
+    if (a.plan === "trial" && a.until){ const d = Math.max(0, Math.ceil((a.until - Date.now()) / 864e5)); trialTxt = ` <span class="trial">⏳ تجربة مجانية: باقي ${d} ${d === 1 ? "يوم" : d === 2 ? "يومان" : d <= 10 ? "أيام" : "يوماً"}</span>`; }
+    $("#who").innerHTML = "👋 " + esc((a.prenom || "") + " " + (a.nom || "")) + trialTxt;
     hideGate(); renderHome(); return true;
   } catch(e){
     showGate(); gateMsg("bad", "لا يوجد اتصال بالإنترنت. أعد المحاولة."); return false;
@@ -549,9 +556,9 @@ $("#loginForm").addEventListener("submit", async e => {
   try {
     const r = await fetch("api/login", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ id, nom, prenom }) });
     const j = await r.json().catch(() => ({}));
-    if (r.ok && j.token){ setAuth({ token: j.token, nom: j.nom, prenom: j.prenom }); gateMsg("ok", "مرحباً " + j.prenom + "!"); await loadLessons(); }
-    else if (j.status === "pending") gateMsg("wait", j.created ? "✅ تم تسجيل طلبك. سيفعّل أستاذك حسابك قريباً، ثم ادخل بنفس المعلومات." : "⏳ حسابك في انتظار التفعيل من طرف الأستاذ.");
-    else if (j.status === "expired") gateMsg("bad", "انتهت مدة اشتراكك. اتصل بأستاذك لتجديد التفعيل.");
+    if (r.ok && j.token){ setAuth({ token: j.token, nom: j.nom, prenom: j.prenom, plan: j.plan || "", until: j.until || null }); gateMsg("ok", "مرحباً " + j.prenom + "!"); await loadLessons(); }
+    else if (j.status === "pending") gateMsg("wait", (j.pay ? "📝 أنت غير مسجَّل بعد. سجّلنا طلبك، وسيُفعَّل حسابك بعد الاشتراك:\n\n" + j.pay + "\n\nبعد التفعيل ادخل بنفس المعلومات." : (j.created ? "✅ تم تسجيل طلبك. سيفعّل أستاذك حسابك قريباً، ثم ادخل بنفس المعلومات." : "⏳ حسابك في انتظار التفعيل من طرف الأستاذ.")));
+    else if (j.status === "expired") gateMsg("bad", (j.trial ? "⏳ انتهت مدة التجربة المجانية. نتمنى أنها أعجبتك! للاستمرار اشترك:" : "انتهت مدة اشتراكك. اتصل بأستاذك لتجديد التفعيل.") + (j.pay ? "\n\n" + j.pay : ""));
     else if (j.status === "disabled") gateMsg("bad", "هذا الحساب موقوف. اتصل بأستاذك.");
     else if (j.error === "mismatch") gateMsg("bad", "اللقب أو الاسم لا يطابق المعلومات المسجلة بهذا الرقم.");
     else if (r.status === 429) gateMsg("bad", "محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.");
@@ -589,11 +596,35 @@ function renderHome(){
                 : sample ? `<span class="badge ai">✨ يحضّره الذكاء الاصطناعي</span>`
                 : `<span class="badge off">قريباً</span>`;
       b.innerHTML = `<span class="n">الدرس ${n}</span><span class="t">${l.title}</span>${badge}`;
+      if (!READY[l.id] && !ready && !sample && TDB[l.id]){
+        b.innerHTML = `<span class="n">الدرس ${n}</span><span class="t">${l.title}</span><span class="badge ready">📝 أعمال موجهة</span>`;
+        b.onclick = () => openTD(l); grid.appendChild(b); return;
+      }
       b.onclick = () => openLesson(l, term.name);
       grid.appendChild(b);
     });
     sec.appendChild(grid); box.appendChild(sec);
   });
+  if (EXAMS.length){
+    const sec = document.createElement("div"); sec.className = "term";
+    sec.innerHTML = `<h2>📋 اختبارات نهاية الفصل (مع الحلول)</h2>`;
+    const grid = document.createElement("div"); grid.className = "grid";
+    EXAMS.forEach(x => {
+      const b = document.createElement("button"); b.className = "lesson-card exam-card";
+      b.innerHTML = `<span class="n">${esc(x.sub || "")}</span><span class="t">${esc(x.title)}</span><span class="badge ready">📋 ${x.ex.length} تمارين</span>`;
+      b.onclick = () => openExam(x); grid.appendChild(b);
+    });
+    sec.appendChild(grid); box.appendChild(sec);
+  }
+}
+function openTD(l){
+  openPanel("📝 أعمال موجهة: " + l.title, `<div id="exList"></div>`);
+  renderExercises(TDB[l.id] || []);
+}
+function openExam(x){
+  const tot = x.ex.reduce((s, e) => s + (+e.points || 0), 0);
+  openPanel("📋 " + x.title, `<p class="muted">${esc(x.sub || "")} — العلامة على ${tot}</p><p>📝 حلّ الاختبار في ورقة كأنك في القسم، دون النظر إلى الحلول، ثم صحّح بنفسك تمريناً تمريناً.</p><div id="exList"></div>`);
+  renderExercises(x.ex);
 }
 
 function cacheGet(id){ try{ const v = localStorage.getItem("amine_"+id); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
@@ -635,7 +666,7 @@ function setControls(on){
   updateAsk();
 }
 function updateAsk(){
-  const bankHas = !!(exBank && lessonMeta && exBank[lessonMeta.id]);
+  const bankHas = !!(lessonMeta && ((exBank && exBank[lessonMeta.id]) || TDB[lessonMeta.id]));
   $("#toolsRow").classList.toggle("hidden", !(sample || bankHas));
   $("#askRow").classList.toggle("hidden", !(sample || remoteAsk));
   $("#askBtn").disabled = !lesson;
@@ -1083,10 +1114,10 @@ function openExercises(){
   if (!lesson) return;
   if (playing) pause();
   if (!sample){
-    const b = exBank && exBank[lessonMeta.id];
-    if (!b){ openPanel("📝 تمارين ووضعيات", `<p>تمارين هذا الدرس ستكون متاحة قريباً.</p>`); return; }
-    const L = [["easy","تطبيقات سهلة"],["exam","نمط الفروض والاختبارات"],["bem","نمط شهادة التعليم المتوسط"]].filter(([k]) => b[k] && b[k].length);
-    openPanel("📝 تمارين ووضعيات: " + lesson.title, `<div class="opt-row"><select id="exLvlB">${L.map(([k,t]) => `<option value="${k}">${t}</option>`).join("")}</select></div><div id="exList"></div>`);
+    const b = Object.assign({}, exBank && exBank[lessonMeta.id], TDB[lessonMeta.id] ? { td: TDB[lessonMeta.id] } : {});
+    if (!Object.keys(b).length){ openPanel("📝 أعمال موجهة", `<p>تمارين هذا الدرس ستكون متاحة قريباً.</p>`); return; }
+    const L = [["td","حصة الأعمال الموجهة"],["easy","تطبيقات سهلة"],["exam","نمط الفروض والاختبارات"],["bem","نمط شهادة التعليم المتوسط"]].filter(([k]) => b[k] && b[k].length);
+    openPanel("📝 أعمال موجهة: " + lesson.title, `<div class="opt-row"><select id="exLvlB">${L.map(([k,t]) => `<option value="${k}">${t}</option>`).join("")}</select></div><div id="exList"></div>`);
     const show = () => renderExercises(b[$("#exLvlB").value] || []);
     $("#exLvlB").onchange = show; show(); return;
   }
@@ -1127,19 +1158,20 @@ async function genExercises(){
   }
   $("#exGo").disabled = false;
 }
-function renderExercises(list){
-  const box = $("#exList"); box.innerHTML = "";
+function renderExercises(list, box){
+  box = box || $("#exList"); box.innerHTML = "";
   list.forEach((x, i) => {
     const c = el("div","ex-card");
     const intg = /وضعية/.test(x.kind || "");
-    c.innerHTML = `<span class="kind ${intg ? "int" : ""}">${esc(x.kind || "تطبيق")}</span><span class="pts">${x.points ? esc(x.points) + " نقاط" : ""}</span>
-      <h4>التمرين ${i+1}${x.title ? " — " + esc(x.title) : ""}</h4><div>${rich(x.text)}</div>
+    const head = x.title && /^التمرين|^الوضعية/.test(x.title) ? esc(x.title) : "التمرين " + (i+1) + (x.title ? " — " + esc(x.title) : "");
+    c.innerHTML = `<span class="kind ${intg ? "int" : ""}">${esc(x.kind || "تطبيق")}</span><span class="pts">${x.points ? (+x.points === 2 ? "نقطتان" : esc(x.points) + (x.points > 2 && x.points < 11 ? " نقاط" : " نقطة")) : ""}</span>
+      <h4>${head}</h4><div>${rich(x.text)}</div>
       <div class="sol"><b>✔ الحل النموذجي:</b><br>${rich(x.solution)}</div>
       <div class="ex-actions"><button class="a1">👁 إظهار الحل</button></div>`;
     c.querySelector(".a1").onclick = e => { c.classList.toggle("show"); e.target.textContent = c.classList.contains("show") ? "🙈 إخفاء الحل" : "👁 إظهار الحل"; };
     box.appendChild(c);
   });
-  const n = el("p","muted","💡 نصيحة: حاول حل التمرين في كراسك قبل أن تنظر إلى الحل، ثم قارن حلك بالحل النموذجي. الذكاء الاصطناعي قد يخطئ أحياناً، فاسأل أستاذك عند الشك.");
+  const n = el("p","muted","💡 نصيحة: حاول حل التمرين في كراسك قبل أن تنظر إلى الحل، ثم قارن حلك بالحل النموذجي. وإذا لم تفهم خطوة فاسأل أستاذك.");
   box.appendChild(n);
 }
 function say(t){ sayEl.textContent = t; }
@@ -1226,6 +1258,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v1.4</div>
+<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v1.8</div>
 </body>
 </html>
