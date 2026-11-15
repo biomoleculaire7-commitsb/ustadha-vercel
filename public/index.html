@@ -605,17 +605,19 @@ function renderHome(){
     });
     sec.appendChild(grid); box.appendChild(sec);
   });
-  if (EXAMS.length){
+  const TN = {1:"الأول", 2:"الثاني", 3:"الثالث"};
+  [1,2,3].forEach(tn => {
+    const list = EXAMS.filter(x => (x.term || 3) === tn); if (!list.length) return;
     const sec = document.createElement("div"); sec.className = "term";
-    sec.innerHTML = `<h2>📋 اختبارات نهاية الفصل (مع الحلول)</h2>`;
+    sec.innerHTML = `<h2>📋 اختبارات الفصل ${TN[tn]} (مع الحلول)</h2>`;
     const grid = document.createElement("div"); grid.className = "grid";
-    EXAMS.forEach(x => {
+    list.forEach(x => {
       const b = document.createElement("button"); b.className = "lesson-card exam-card";
       b.innerHTML = `<span class="n">${esc(x.sub || "")}</span><span class="t">${esc(x.title)}</span><span class="badge ready">📋 ${x.ex.length} تمارين</span>`;
       b.onclick = () => openExam(x); grid.appendChild(b);
     });
     sec.appendChild(grid); box.appendChild(sec);
-  }
+  });
 }
 function openTD(l){
   openPanel("📝 أعمال موجهة: " + l.title, `<div id="exList"></div>`);
@@ -897,11 +899,13 @@ function loadVoices(){
 function fillVoiceSel(){
   const sel = $("#voiceSel"); if (!sel) return;
   const opts = [];
-  if (audioManifest) opts.push(["rec", "👩‍🏫 صوت الأستاذة"]);
+  if (audioManifest){ opts.push(["rec", "👩‍🏫 صوت الأستاذة"], ["none", "🔇 بدون صوت"]); }
+  else {
   if (tts) CLAUDE_VOICES.forEach(([id,label]) => opts.push(["claude:" + id, label]));
   sysVoices.forEach(v => opts.push([ "sys:" + v.name, "🗣 " + v.name.replace(/Microsoft |Google |Online \(Natural\)|- Arabic.*$/g,"").trim() + " (" + v.lang + ")" ]));
   if (!sysVoices.length && window.speechSynthesis) opts.push(["sys:auto", "🗣 صوت الجهاز (عربي)"]);
   if (!opts.length) opts.push(["none","لا يوجد صوت عربي هنا"]);
+  }
   sel.innerHTML = opts.map(([v,l]) => `<option value="${v}">${l}</option>`).join("");
   if (voiceChoice && opts.some(o => o[0] === voiceChoice)) sel.value = voiceChoice;
   else { voiceChoice = opts[0][0]; sel.value = voiceChoice; }
@@ -930,9 +934,7 @@ async function speak(text, tk){
         });
         curAudio = null;
       } else {
-        const v = sysVoices[0];
-        if (window.speechSynthesis) await new Promise(res => { const u = new SpeechSynthesisUtterance(text); if (v) u.voice = v; u.lang = v ? v.lang : "ar-SA"; u.rate = 0.92 * speed; u.onend = res; u.onerror = res; speechSynthesis.speak(u); });
-        else await readTime();
+        await readTime();   // مقطع غير مسجّل بعد: نكتفي بالكتابة على السبورة
       }
     } else if (voiceChoice.startsWith("sys:")){
       const v = sysVoices.find(x => "sys:" + x.name === voiceChoice);
@@ -1258,6 +1260,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v1.8</div>
+<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v1.9</div>
 </body>
 </html>
