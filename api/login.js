@@ -1,6 +1,7 @@
 import { dbReady, getStudent, putStudent, normName, sign, limited, body } from "./_lib.js";
 
 export default async function handler(req, res) {
+  if (req.method === "GET") return res.status(200).json({ pay: process.env.PAY_INFO || "", trialDays: parseInt(process.env.TRIAL_DAYS || "0") });
   if (req.method !== "POST") return res.status(405).end();
   if (!dbReady()) return res.status(503).json({ error: "db" });
   if (limited(req, "login:", 20, 15 * 60e3)) return res.status(429).json({ error: "rate" });
