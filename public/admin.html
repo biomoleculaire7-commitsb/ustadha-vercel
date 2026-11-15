@@ -51,12 +51,16 @@
           <option value="custom">تاريخ آخر…</option>
         </select>
         <input id="until" type="date">
+        <select id="plan">
+          <option value="free">🎓 تلميذي (مجاني)</option>
+          <option value="paid">💳 مشترك (دفع 2000 دج)</option>
+        </select>
       </div>
       <p class="muted">التواريخ المقترحة تقريبية، فعدّلها حسب الرزنامة الرسمية.</p>
     </div>
 
     <div class="card">
-      <b>إضافة تلميذ وتفعيله مباشرة</b> <span class="muted">(مثلاً تلاميذ قسمك)</span>
+      <b>إضافة تلميذ وتفعيله مباشرة</b> <span class="muted">(يُضاف بالنوع المختار في الأعلى)</span>
       <div class="row" style="margin-top:8px">
         <input id="aId" inputmode="numeric" placeholder="الرقم المدرسي (16 رقماً)" style="direction:ltr;text-align:center">
         <input id="aNom" placeholder="اللقب"><input id="aPre" placeholder="الاسم">
@@ -74,11 +78,15 @@
         <button data-f="pending" class="on">في الانتظار<span class="count" id="c-pending"></span></button>
         <button data-f="active">مفعّلون<span class="count" id="c-active"></span></button>
         <button data-f="off">موقوفون / منتهون<span class="count" id="c-off"></span></button>
+        <button data-f="free">🎓 تلاميذي<span class="count" id="c-free"></span></button>
+        <button data-f="paid">💳 مشتركون<span class="count" id="c-paid"></span></button>
+        <button data-f="trial">⏳ تجربة<span class="count" id="c-trial"></span></button>
         <button data-f="all">الكل<span class="count" id="c-all"></span></button>
       </div>
       <input id="q" placeholder="🔍 بحث بالاسم أو الرقم" style="width:100%;margin-bottom:8px">
       <table><thead><tr><th>اللقب والاسم</th><th>الرقم المدرسي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="tb"></tbody></table>
       <p class="muted" id="empty"></p>
+      <p class="muted" id="income"></p>
     </div>
   </div>
 </div>
@@ -110,19 +118,25 @@ function stOf(s){ if (s.status === "active" && s.until && Date.now() > s.until) 
 const LBL = { pending:"في الانتظار", active:"مفعّل", disabled:"موقوف", expired:"منتهي" };
 function render(){
   const q = $("#q").value.trim().toLowerCase();
-  const cnt = { pending:0, active:0, off:0, all:ALL.length };
-  ALL.forEach(s => { const t = stOf(s); if (t === "pending") cnt.pending++; else if (t === "active") cnt.active++; else cnt.off++; });
+  const cnt = { pending:0, active:0, off:0, free:0, paid:0, trial:0, all:ALL.length };
+  ALL.forEach(s => { const t = stOf(s); if (t === "pending") cnt.pending++; else if (t === "active") cnt.active++; else cnt.off++;
+    if (s.plan === "paid") cnt.paid++; else if (s.plan === "free") cnt.free++; else if (s.plan === "trial") cnt.trial++; });
+  const paidActive = ALL.filter(s => s.plan === "paid" && stOf(s) === "active").length;
+  $("#income").textContent = paidActive ? `💰 مشتركون مفعّلون: ${paidActive} — حوالي ${(paidActive * 2000).toLocaleString("ar-DZ")} دج للفصل` : "";
   Object.keys(cnt).forEach(k => $("#c-" + k).textContent = "(" + cnt[k] + ")");
   const rows = ALL.filter(s => {
     const t = stOf(s);
     if (F === "pending" && t !== "pending") return false;
     if (F === "active" && t !== "active") return false;
     if (F === "off" && !(t === "disabled" || t === "expired")) return false;
+    if (F === "free" && s.plan !== "free") return false;
+    if (F === "paid" && s.plan !== "paid") return false;
+    if (F === "trial" && s.plan !== "trial") return false;
     return !q || (s.nom + " " + s.prenom + " " + s.id).toLowerCase().includes(q);
   });
   $("#tb").innerHTML = rows.map(s => {
     const t = stOf(s), until = s.until ? new Date(s.until).toLocaleDateString("ar-DZ") : "";
-    return `<tr><td><b>${esc(s.nom)}</b> ${esc(s.prenom)}</td><td class="id">${s.id.replace(/(\d{4})(?=\d)/g,"$1 ")}</td>
+    return `<tr><td><b>${esc(s.nom)}</b> ${esc(s.prenom)} ${s.plan === "paid" ? "💳" : s.plan === "free" ? "🎓" : s.plan === "trial" ? "⏳" : ""}</td><td class="id">${s.id.replace(/(\d{4})(?=\d)/g,"$1 ")}</td>
       <td><span class="st ${t}">${LBL[t]}</span> <span class="muted">${until ? "حتى " + until : ""}</span></td>
       <td class="acts">${t !== "active" ? `<button data-a="activate" data-id="${s.id}">✅ تفعيل</button>` : `<button class="ghost" data-a="activate" data-id="${s.id}">🔄 تمديد</button><button class="red" data-a="disable" data-id="${s.id}">⛔ إيقاف</button>`}
       <button class="red" data-a="delete" data-id="${s.id}">🗑</button></td></tr>`;
@@ -136,7 +150,7 @@ $("#tb").onclick = async e => {
   const a = b.dataset.a, id = b.dataset.id;
   if (a === "delete" && !confirmBox("حذف هذا التلميذ نهائياً؟")) return;
   b.disabled = true;
-  try { await api("POST", { action: a, id, until: a === "activate" ? untilTs() : undefined }); await refresh(); }
+  try { await api("POST", { action: a, id, until: a === "activate" ? untilTs() : undefined, plan: a === "activate" ? $("#plan").value : undefined }); await refresh(); }
   catch(err){ alertBox("تعذّر التنفيذ: " + err.message); b.disabled = false; }
 };
 function confirmBox(m){ try { return window.confirm(m); } catch(e){ return true; } }
@@ -147,7 +161,7 @@ $("#q").oninput = render;
 $("#aGo").onclick = async () => {
   const id = $("#aId").value.replace(/\D/g,""), nom = $("#aNom").value.trim(), prenom = $("#aPre").value.trim();
   if (id.length !== 16 || !nom || !prenom) return alertBox("أكمل الرقم (16 رقماً) واللقب والاسم.");
-  try { await api("POST", { action:"add", id, nom, prenom, until: untilTs() }); $("#aId").value = $("#aNom").value = $("#aPre").value = ""; await refresh(); }
+  try { await api("POST", { action:"add", id, nom, prenom, until: untilTs(), plan: $("#plan").value }); $("#aId").value = $("#aNom").value = $("#aPre").value = ""; await refresh(); }
   catch(err){ alertBox("تعذّرت الإضافة: " + err.message); }
 };
 $("#bulkGo").onclick = async () => {
@@ -156,7 +170,7 @@ $("#bulkGo").onclick = async () => {
   for (const [idr, nom, prenom] of lines){
     const id = idr.replace(/\D/g,"");
     if (id.length !== 16 || !nom || !prenom){ bad++; continue; }
-    try { await api("POST", { action:"add", id, nom, prenom, until: untilTs() }); ok++; } catch(e){ bad++; }
+    try { await api("POST", { action:"add", id, nom, prenom, until: untilTs(), plan: $("#plan").value }); ok++; } catch(e){ bad++; }
     $("#bulkMsg").textContent = `✅ ${ok}  ✗ ${bad}`;
   }
   await refresh();
