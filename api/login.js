@@ -10,17 +10,23 @@ export default async function handler(req, res) {
   if (id.length !== 16 || !nom || !prenom) return res.status(400).json({ error: "invalid" });
 
   let st = await getStudent(id);
+  const trialDays = parseInt(process.env.TRIAL_DAYS || "0");
   if (!st) {
-    st = { id, nom, prenom, status: "pending", created: Date.now() };
-    await putStudent(st);
-    return res.status(403).json({ status: "pending", created: true });
+    if (trialDays > 0) {
+      st = { id, nom, prenom, status: "active", plan: "trial", created: Date.now(), until: Date.now() + trialDays * 864e5 };
+      await putStudent(st);
+    } else {
+      st = { id, nom, prenom, status: "pending", created: Date.now() };
+      await putStudent(st);
+      return res.status(403).json({ status: "pending", created: true, pay: process.env.PAY_INFO || "" });
+    }
   }
   if (normName(st.nom) !== normName(nom) || normName(st.prenom) !== normName(prenom)) return res.status(403).json({ error: "mismatch" });
-  if (st.status === "pending") return res.status(403).json({ status: "pending" });
+  if (st.status === "pending") return res.status(403).json({ status: "pending", pay: process.env.PAY_INFO || "" });
   if (st.status === "disabled") return res.status(403).json({ status: "disabled" });
-  if (st.until && Date.now() > st.until) return res.status(403).json({ status: "expired" });
+  if (st.until && Date.now() > st.until) return res.status(403).json({ status: "expired", trial: st.plan === "trial", pay: process.env.PAY_INFO || "" });
 
   const exp = Math.min(st.until || Infinity, Date.now() + 30 * 864e5);
   st.lastLogin = Date.now(); await putStudent(st);
-  return res.status(200).json({ token: sign({ id, exp }), nom: st.nom, prenom: st.prenom });
+  return res.status(200).json({ token: sign({ id, exp }), nom: st.nom, prenom: st.prenom, plan: st.plan || "", until: st.until || null });
 }
