@@ -271,6 +271,12 @@
       <input id="gNom" autocomplete="family-name" required>
       <label for="gPre">الاسم</label>
       <input id="gPre" autocomplete="given-name" required>
+      <a href="#" id="codeLink" style="display:block;margin-top:10px;font-size:14px;color:var(--accent)">🔑 لديّ رمز تفعيل</a>
+      <div id="codeBox" style="display:none">
+        <label for="gCode">رمز التفعيل</label>
+        <input id="gCode" class="num" maxlength="12" placeholder="XXXX XXXX" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px">
+        <div class="hint">الرمز الذي أرسله لك الأستاذ بعد الاشتراك (يُستعمل مرة واحدة)</div>
+      </div>
       <button id="gBtn" type="submit">دخول</button>
     </form>
     <div class="msg" id="gMsg"></div>
@@ -516,6 +522,8 @@ let pendingReveal = null;
 const AUTH_KEY = "ustadha_auth";
 function getAuth(){ try { return JSON.parse(localStorage.getItem(AUTH_KEY) || "null"); } catch(e){ return null; } }
 function setAuth(a){ try { a ? localStorage.setItem(AUTH_KEY, JSON.stringify(a)) : localStorage.removeItem(AUTH_KEY); } catch(e){} }
+function showCodeBox(){ $("#codeBox").style.display = "block"; $("#codeLink").style.display = "none"; }
+$("#codeLink").onclick = e => { e.preventDefault(); showCodeBox(); $("#gCode").focus(); };
 function gateMsg(kind, text){ const m = $("#gMsg"); m.className = "msg " + kind; m.textContent = text; m.style.whiteSpace = "pre-line"; }
 function showGate(){ $("#gate").classList.remove("hidden"); }
 function hideGate(){ $("#gate").classList.add("hidden"); }
@@ -557,12 +565,14 @@ $("#loginForm").addEventListener("submit", async e => {
   if (!nom || !prenom){ gateMsg("bad", "اكتب اللقب والاسم."); return; }
   $("#gBtn").disabled = true; gateMsg("wait", "جارٍ التحقق…");
   try {
-    const r = await fetch("api/login", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ id, nom, prenom }) });
+    const r = await fetch("api/login", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ id, nom, prenom, code: ($("#gCode").value || "").trim() }) });
     const j = await r.json().catch(() => ({}));
     if (r.ok && j.token){ setAuth({ token: j.token, nom: j.nom, prenom: j.prenom, plan: j.plan || "", until: j.until || null }); gateMsg("ok", "مرحباً " + j.prenom + "!"); await loadLessons(); }
-    else if (j.status === "pending") gateMsg("wait", (j.pay ? "📝 أنت غير مسجَّل بعد. سجّلنا طلبك، وسيُفعَّل حسابك بعد الاشتراك:\n\n" + j.pay + "\n\nبعد التفعيل ادخل بنفس المعلومات." : (j.created ? "✅ تم تسجيل طلبك. سيفعّل أستاذك حسابك قريباً، ثم ادخل بنفس المعلومات." : "⏳ حسابك في انتظار التفعيل من طرف الأستاذ.")));
-    else if (j.status === "expired") gateMsg("bad", (j.trial ? "⏳ انتهت مدة التجربة المجانية. نتمنى أنها أعجبتك! للاستمرار اشترك:" : "انتهت مدة اشتراكك. اتصل بأستاذك لتجديد التفعيل.") + (j.pay ? "\n\n" + j.pay : ""));
+    else if (j.status === "pending") showCodeBox(), gateMsg("wait", (j.pay ? "📝 أنت غير مسجَّل بعد. سجّلنا طلبك، وسيُفعَّل حسابك بعد الاشتراك:\n\n" + j.pay + "\n\nبعد التفعيل ادخل بنفس المعلومات." : (j.created ? "✅ تم تسجيل طلبك. سيفعّل أستاذك حسابك قريباً، ثم ادخل بنفس المعلومات." : "⏳ حسابك في انتظار التفعيل من طرف الأستاذ.")));
+    else if (j.status === "expired") { showCodeBox(); gateMsg("bad", (j.trial ? "⏳ انتهت مدة التجربة المجانية. نتمنى أنها أعجبتك! للاستمرار اشترك:" : "انتهت مدة اشتراكك. للتجديد اشترك ثم أدخل رمز التفعيل الجديد:") + (j.pay ? "\n\n" + j.pay : "") + "\n\n🔑 بعد الدفع سيصلك رمز تفعيل: اكتبه في الخانة أعلاه واضغط دخول.") }
     else if (j.status === "disabled") gateMsg("bad", "هذا الحساب موقوف. اتصل بأستاذك.");
+    else if (j.error === "badcode") gateMsg("bad", "رمز التفعيل غير صحيح. تأكد من كتابته كما وصلك.");
+    else if (j.error === "usedcode") gateMsg("bad", "هذا الرمز استُعمل من قبل. كل رمز صالح لتلميذ واحد فقط.");
     else if (j.error === "mismatch") gateMsg("bad", "اللقب أو الاسم لا يطابق المعلومات المسجلة بهذا الرقم.");
     else if (r.status === 429) gateMsg("bad", "محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.");
     else if (r.status === 503) gateMsg("bad", "الخادم غير مُعدّ بعد (قاعدة البيانات). أخبر أستاذك.");
@@ -1280,6 +1290,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v2.0</div>
+<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v2.1</div>
 </body>
 </html>
