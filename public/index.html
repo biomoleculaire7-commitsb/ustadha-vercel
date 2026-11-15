@@ -953,7 +953,16 @@ async function speak(text, tk){
   if (muted || !voiceChoice || voiceChoice === "none") return readTime();
   teacherEl.classList.add("speaking");
   try {
-    if (voiceChoice === "rec"){
+    if (tk.device && window.speechSynthesis){
+      // أجوبة الأسئلة تُكتب لحظتها فلا تسجيل لها: نقرؤها بصوت الجهاز العربي
+      const v = sysVoices[0];
+      await new Promise(res => {
+        const u = new SpeechSynthesisUtterance(text); if (v) u.voice = v; u.lang = v ? v.lang : "ar-SA"; u.rate = 0.95 * speed;
+        const guard = setTimeout(res, Math.max(4000, text.length * 120) / speed);
+        u.onend = () => { clearTimeout(guard); res(); }; u.onerror = () => { clearTimeout(guard); res(); };
+        speechSynthesis.speak(u);
+      });
+    } else if (voiceChoice === "rec"){
       const h = await hashText(text);
       const f = h && audioManifest && audioManifest.files && audioManifest.files[h];
       if (f){
@@ -1060,6 +1069,7 @@ ${FORMAT}`;
     }
     const ans = validate(v, "");
     $("#askInput").value = "";
+    tk.device = true;
     for (const s of ans.steps){ if (tk.dead) break; if (s.t === "clear" || s.t === "stage" || s.t === "info") continue; await doStep(s, tk); await wait(300/speed); }
     if (!tk.dead && !pendingReveal) sayEl.textContent = wasPlaying || idx > 0 ? "هل اتضح الأمر؟ اضغط «متابعة» لنكمل الدرس." : "هل اتضح الأمر؟ اضغط «ابدأ الدرس».";
   } catch(e){
@@ -1290,6 +1300,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:2px;left:6px;font-size:10px;opacity:.45;color:#fff;pointer-events:none;z-index:9999">v2.2</div>
+<div id="appVer" style="position:fixed;bottom:4px;left:8px;font-size:12px;color:#555;background:rgba(255,255,255,.8);border-radius:6px;padding:1px 6px;pointer-events:none;z-index:9999">v2.4</div>
 </body>
 </html>
