@@ -499,7 +499,7 @@ const $ = s => document.querySelector(s);
 const board = $("#board"), sayEl = $("#say"), teacherEl = $("#teacher");
 let sample = null, tts = null;
 /* ---- النسخة المستقلة (Vercel): صوت مسجل + بنك تمارين + خادم اختياري ---- */
-let TDB = {}, EXAMS = [];
+let TDB = {}, EXAMS = [], BOOK = [];
 let audioManifest = null, exBank = null, remoteAsk = false, curAudio = null;
 (async () => { try { const r = await fetch("audio/manifest.json", {cache:"no-cache"}); if (r.ok) { audioManifest = await r.json(); fillVoiceSel(); } } catch(e){} })();
 (async () => { try { const r = await fetch("exercises.json", {cache:"no-cache"}); if (r.ok) { exBank = await r.json(); updateAsk(); } } catch(e){} })();
@@ -543,9 +543,11 @@ async function loadLessons(){
     if (!r.ok){ showGate(); gateMsg("bad", r.status === 503 ? "الخادم غير مُعدّ بعد (قاعدة البيانات). أخبر أستاذك." : "تعذّر تحميل الدروس. تحقق من الإنترنت ثم أعد المحاولة."); return false; }
     const code = await r.text();
     READY = new Function("PLOT", "DIV", code)(PLOT, DIV);
-    try { const rb = await fetch("api/bank", { headers: { authorization: "Bearer " + a.token } }); if (rb.ok){ const B = await rb.json(); TDB = B.td || {}; EXAMS = B.exams || []; } } catch(e){}
+    try { const rb = await fetch("api/bank", { headers: { authorization: "Bearer " + a.token } }); if (rb.ok){ const B = await rb.json(); TDB = B.td || {}; EXAMS = B.exams || []; BOOK = B.book || []; } } catch(e){}
     let trialTxt = "";
-    if (a.plan === "trial" && a.until){ const d = Math.max(0, Math.ceil((a.until - Date.now()) / 864e5)); trialTxt = ` <span class="trial">⏳ تجربة مجانية: باقي ${d} ${d === 1 ? "يوم" : d === 2 ? "يومان" : d <= 10 ? "أيام" : "يوماً"}</span>`; }
+    if (a.plan === "trial" && a.until){ const day0 = t => { const x = new Date(t); x.setHours(0,0,0,0); return x.getTime(); };
+      const d = Math.max(0, Math.round((day0(a.until) - day0(Date.now())) / 864e5));
+      const endTxt = new Date(a.until).toLocaleDateString("ar-DZ", { day: "numeric", month: "long" }); trialTxt = ` <span class="trial">⏳ تجربة مجانية: ${d === 0 ? "آخر يوم" : "باقي " + d + " " + (d === 1 ? "يوم" : d === 2 ? "يومان" : d <= 10 ? "أيام" : "يوماً")} (حتى ${endTxt})</span>`; }
     $("#who").innerHTML = "👋 " + esc((a.prenom || "") + " " + (a.nom || "")) + trialTxt;
     $("#payBtn").classList.toggle("show", a.plan === "trial");
     hideGate(); renderHome(); return true;
@@ -635,6 +637,17 @@ function renderHome(){
     });
     sec.appendChild(grid); box.appendChild(sec);
   });
+  if (BOOK.length){
+    const sec = document.createElement("div"); sec.className = "term";
+    sec.innerHTML = `<h2>📗 حلول تمارين الكتاب المدرسي</h2>`;
+    const grid = document.createElement("div"); grid.className = "grid";
+    BOOK.forEach(c => {
+      const b = document.createElement("button"); b.className = "lesson-card exam-card";
+      b.innerHTML = `<span class="n">الباب ${c.ch} — الصفحات ${esc(c.pages || "")}</span><span class="t">${esc(c.title)}</span><span class="badge ready">📗 حلول خطوة بخطوة</span>`;
+      b.onclick = () => openBook(c); grid.appendChild(b);
+    });
+    sec.appendChild(grid); box.appendChild(sec);
+  }
   const TN = {1:"الأول", 2:"الثاني", 3:"الثالث"};
   [1,2,3].forEach(tn => {
     const list = EXAMS.filter(x => (x.term || 3) === tn); if (!list.length) return;
@@ -652,6 +665,19 @@ function renderHome(){
 function openTD(l){
   openPanel("📝 أعمال موجهة: " + l.title, `<div id="exList"></div>`);
   renderExercises(TDB[l.id] || []);
+}
+function openBook(c){
+  const pages = [...new Set(c.items.map(x => x.p))].sort((a,b) => a - b);
+  const btns = pages.map(pg => `<div style="margin:10px 0 4px;font-weight:700">📄 الصفحة ${pg}</div><div style="display:flex;flex-wrap:wrap;gap:6px">` +
+    c.items.map((x,i) => x.p === pg ? `<button class="bk" data-i="${i}" style="min-width:44px;padding:8px 10px;border-radius:10px;border:1px solid #cfe0d6;background:#fff;font-weight:700">${esc(x.n)}</button>` : "").join("") + `</div>`).join("");
+  openPanel("📗 " + c.title, `<p class="muted">اقرأ نص التمرين في كتابك المدرسي، حاول حله، ثم اختر رقمه لترى الحل.</p>${btns}<div id="bkSol" style="margin-top:14px"></div>`);
+  document.querySelectorAll("#pBody .bk").forEach(b => b.onclick = () => {
+    const x = c.items[+b.dataset.i];
+    document.querySelectorAll("#pBody .bk").forEach(o => o.style.background = "#fff"); b.style.background = "#e3f4ea";
+    const box = $("#bkSol");
+    box.innerHTML = `<div class="ex-card"><h4>${/^\d+$/.test(x.n) ? "التمرين " + esc(x.n) : "«" + esc(x.n) + "»"} ص ${x.p}${x.t ? " — " + esc(x.t) : ""}</h4><div class="sol" style="display:block">${rich(x.s)}</div></div>`;
+    box.scrollIntoView({behavior:"smooth", block:"start"});
+  });
 }
 function openExam(x){
   const tot = x.ex.reduce((s, e) => s + (+e.points || 0), 0);
@@ -1300,6 +1326,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:4px;left:8px;font-size:12px;color:#555;background:rgba(255,255,255,.8);border-radius:6px;padding:1px 6px;pointer-events:none;z-index:9999">v2.4</div>
+<div id="appVer" style="position:fixed;bottom:4px;left:8px;font-size:12px;color:#555;background:rgba(255,255,255,.8);border-radius:6px;padding:1px 6px;pointer-events:none;z-index:9999">v2.7</div>
 </body>
 </html>
