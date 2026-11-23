@@ -1,7 +1,6 @@
-import { dbReady, redis, getStudent, putStudent, normName, sign, limited, body } from "./_lib.js";
+import { dbReady, getStudent, putStudent, normName, sign, limited, body } from "./_lib.js";
 
 export default async function handler(req, res) {
-  if (req.method === "GET") return res.status(200).json({ pay: process.env.PAY_INFO || "", trialDays: parseInt(process.env.TRIAL_DAYS || "0") });
   if (req.method !== "POST") return res.status(405).end();
   if (!dbReady()) return res.status(503).json({ error: "db" });
   if (limited(req, "login:", 20, 15 * 60e3)) return res.status(429).json({ error: "rate" });
@@ -11,23 +10,6 @@ export default async function handler(req, res) {
   if (id.length !== 16 || !nom || !prenom) return res.status(400).json({ error: "invalid" });
 
   let st = await getStudent(id);
-  // تفعيل برمز يرسله الأستاذ بعد الدفع (يُستعمل مرة واحدة فقط)
-  const code = String(b.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (code) {
-    const raw = await redis("GET", "code:" + code);
-    if (!raw) return res.status(403).json({ error: "badcode" });
-    const rec = JSON.parse(raw);
-    if (rec.usedBy && rec.usedBy !== id) return res.status(403).json({ error: "usedcode" });
-    if (st && (normName(st.nom) !== normName(nom) || normName(st.prenom) !== normName(prenom))) return res.status(403).json({ error: "mismatch" });
-    if (!rec.usedBy) {
-      const claimed = await redis("SET", "codeuse:" + code, id, "NX");
-      if (!claimed) return res.status(403).json({ error: "usedcode" });
-      rec.usedBy = id; rec.usedName = nom + " " + prenom; rec.usedAt = Date.now();
-      await redis("SET", "code:" + code, JSON.stringify(rec));
-      st = { ...(st || { id, nom, prenom, created: Date.now() }), status: "active", plan: rec.plan || "paid", until: rec.until || null, activated: Date.now(), code };
-      await putStudent(st);
-    }
-  }
   const trialDays = parseInt(process.env.TRIAL_DAYS || "0");
   if (!st) {
     if (trialDays > 0) {
