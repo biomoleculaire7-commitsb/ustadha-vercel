@@ -199,6 +199,8 @@
   .ask button{border:none;border-radius:12px;padding:10px 14px;background:#5b3fb0;color:#fff;font-weight:700;font-size:14px;white-space:nowrap}
   .ask button:disabled{opacity:.5}
   .err{color:#b3261e;font-size:14px;margin-top:6px;text-align:center}
+  #gate #trialBtn{background:#fff7e0;color:#7a5a00;border:1px solid #e9d9a8!important;font-weight:700}
+  #gate #payBtn2,#gate #installBtn2{background:#fff;color:var(--accent,#1f7a5a);font-weight:700}
 </style>
 </head>
 <body>
@@ -262,23 +264,14 @@
   <div class="card">
     <div class="logo" aria-hidden="true"><svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" direction="ltr" style="direction:ltr">  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#25906a"/><stop offset="1" stop-color="#145c43"/></linearGradient></defs>  <rect width="512" height="512" rx="112" fill="url(#g)"/>  <rect x="78" y="104" width="356" height="262" rx="22" fill="#8a5a2b"/>  <rect x="94" y="120" width="324" height="230" rx="12" fill="#1d3b30"/>  <g fill="none" stroke="#f5f1e6" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">    <path d="M120 248 L146 236 L178 312 L222 160 L330 160"/>  </g>  <text x="240" y="282" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="112" fill="#f5f1e6">x</text>  <text x="304" y="232" font-family="Georgia, serif" font-size="62" fill="#f5f1e6">2</text>  <polygon points="350,330 400,330 400,278" fill="none" stroke="#ffd166" stroke-width="7" stroke-linejoin="round"/>  <text x="118" y="336" font-family="Georgia, serif" font-size="58" fill="#ffd166">π</text>  <rect x="218" y="366" width="76" height="14" rx="4" fill="#6b4420"/>  <rect x="156" y="392" width="200" height="22" rx="11" fill="#f5f1e6" opacity=".95"/>  <rect x="300" y="396" width="44" height="14" rx="7" fill="#ffd166"/></svg></div>
     <h2>الأستاذ المرافق الذكي</h2>
-    <p>رياضيات السنة الرابعة متوسط<br>ادخل بمعلوماتك كما هي في الشهادة المدرسية</p>
-    <form id="loginForm" autocomplete="on">
-      <label for="gId">رقم التعريف المدرسي (16 رقماً)</label>
-      <input id="gId" class="num" inputmode="numeric" maxlength="19" placeholder="0000 0000 0000 0000" required>
-      <div class="hint">الرقم المكتوب في الشهادة المدرسية</div>
-      <label for="gNom">اللقب</label>
-      <input id="gNom" autocomplete="family-name" required>
-      <label for="gPre">الاسم</label>
-      <input id="gPre" autocomplete="given-name" required>
-      <a href="#" id="codeLink" style="display:block;margin-top:10px;font-size:14px;color:var(--accent)">🔑 لديّ رمز تفعيل</a>
-      <div id="codeBox" style="display:none">
-        <label for="gCode">رمز التفعيل</label>
-        <input id="gCode" class="num" maxlength="12" placeholder="XXXX XXXX" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px">
-        <div class="hint">الرمز الذي أرسله لك الأستاذ بعد الاشتراك (يُستعمل مرة واحدة)</div>
-      </div>
+    <p>رياضيات السنة الرابعة متوسط<br>ادخل برمز التفعيل الذي أرسله لك أستاذك</p>
+    <form id="loginForm" autocomplete="off">
+      <label for="gCode">🔑 رمز التفعيل</label>
+      <input id="gCode" class="num" maxlength="9" placeholder="XXXX-XXXX" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:3px;font-size:22px;text-align:center">
+      <div class="hint">8 حروف وأرقام، يصلك بعد الاشتراك</div>
       <button id="gBtn" type="submit">دخول</button>
     </form>
+    <button id="trialBtn" class="install show" type="button" style="width:100%;border:1px solid #cfe9d9;margin-top:10px;display:none">🎁 جرّب مجاناً بدون رمز</button>
     <div class="msg" id="gMsg"></div>
     <button id="payBtn2" class="install show" type="button" style="width:100%;border:1px solid #e9d9a8;margin-bottom:8px">💳 كيفية الاشتراك</button>
     <button id="installBtn2" class="install" type="button" style="width:100%;border:1px solid #cfe9d9">📲 تثبيت التطبيق على الهاتف</button>
@@ -517,13 +510,11 @@ let pendingReveal = null;
 (async () => { try { sample = await claude.use("sample"); } catch(e){} renderHome(); updateAsk(); })();
 
 /* ============================================================
-   الدخول بالرقم المدرسي + تحميل الدروس من الخادم
+   الدخول برمز التفعيل + تحميل الدروس من الخادم
    ============================================================ */
 const AUTH_KEY = "ustadha_auth";
 function getAuth(){ try { return JSON.parse(localStorage.getItem(AUTH_KEY) || "null"); } catch(e){ return null; } }
 function setAuth(a){ try { a ? localStorage.setItem(AUTH_KEY, JSON.stringify(a)) : localStorage.removeItem(AUTH_KEY); } catch(e){} }
-function showCodeBox(){ $("#codeBox").style.display = "block"; $("#codeLink").style.display = "none"; }
-$("#codeLink").onclick = e => { e.preventDefault(); showCodeBox(); $("#gCode").focus(); };
 function gateMsg(kind, text){ const m = $("#gMsg"); m.className = "msg " + kind; m.textContent = text; m.style.whiteSpace = "pre-line"; }
 function showGate(){ $("#gate").classList.remove("hidden"); }
 function hideGate(){ $("#gate").classList.add("hidden"); }
@@ -548,7 +539,7 @@ async function loadLessons(){
     if (a.plan === "trial" && a.until){ const day0 = t => { const x = new Date(t); x.setHours(0,0,0,0); return x.getTime(); };
       const d = Math.max(0, Math.round((day0(a.until) - day0(Date.now())) / 864e5));
       const endTxt = new Date(a.until).toLocaleDateString("ar-DZ", { day: "numeric", month: "long" }); trialTxt = ` <span class="trial">⏳ تجربة مجانية: ${d === 0 ? "آخر يوم" : "باقي " + d + " " + (d === 1 ? "يوم" : d === 2 ? "يومان" : d <= 10 ? "أيام" : "يوماً")} (حتى ${endTxt})</span>`; }
-    $("#who").innerHTML = "👋 " + esc((a.prenom || "") + " " + (a.nom || "")) + trialTxt;
+    $("#who").innerHTML = "👋 مرحباً بك" + trialTxt;
     $("#payBtn").classList.toggle("show", a.plan === "trial");
     hideGate(); renderHome(); return true;
   } catch(e){
@@ -556,32 +547,40 @@ async function loadLessons(){
   }
 }
 
-$("#gId").addEventListener("input", e => {
-  const d = e.target.value.replace(/\D/g, "").slice(0, 16);
-  e.target.value = d.replace(/(\d{4})(?=\d)/g, "$1 ");
+function deviceId(){
+  try { let d = localStorage.getItem("ustadha_dev"); if (!d){ d = (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2))).replace(/[^A-Za-z0-9-]/g, ""); localStorage.setItem("ustadha_dev", d); } return d; }
+  catch(e){ return "nostorage-" + Date.now(); }
+}
+$("#gCode").addEventListener("input", e => {
+  const c = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+  e.target.value = c.length > 4 ? c.slice(0, 4) + "-" + c.slice(4) : c;
 });
-$("#loginForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const id = $("#gId").value.replace(/\D/g, ""), nom = $("#gNom").value.trim(), prenom = $("#gPre").value.trim();
-  if (id.length !== 16){ gateMsg("bad", "رقم التعريف المدرسي يتكون من 16 رقماً."); return; }
-  if (!nom || !prenom){ gateMsg("bad", "اكتب اللقب والاسم."); return; }
-  $("#gBtn").disabled = true; gateMsg("wait", "جارٍ التحقق…");
+fetch("api/login").then(r => r.json()).then(j => { if (j.trialDays > 0){ $("#trialBtn").style.display = "block"; $("#trialBtn").textContent = "🎁 جرّب مجاناً " + j.trialDays + " أيام بدون رمز"; } }).catch(() => {});
+async function doLogin(payload){
+  $("#gBtn").disabled = true; $("#trialBtn").disabled = true; gateMsg("wait", "جارٍ التحقق…");
   try {
-    const r = await fetch("api/login", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ id, nom, prenom, code: ($("#gCode").value || "").trim() }) });
+    const r = await fetch("api/login", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ ...payload, device: deviceId() }) });
     const j = await r.json().catch(() => ({}));
-    if (r.ok && j.token){ setAuth({ token: j.token, nom: j.nom, prenom: j.prenom, plan: j.plan || "", until: j.until || null }); gateMsg("ok", "مرحباً " + j.prenom + "!"); await loadLessons(); }
-    else if (j.status === "pending") showCodeBox(), gateMsg("wait", (j.pay ? "📝 أنت غير مسجَّل بعد. سجّلنا طلبك، وسيُفعَّل حسابك بعد الاشتراك:\n\n" + j.pay + "\n\nبعد التفعيل ادخل بنفس المعلومات." : (j.created ? "✅ تم تسجيل طلبك. سيفعّل أستاذك حسابك قريباً، ثم ادخل بنفس المعلومات." : "⏳ حسابك في انتظار التفعيل من طرف الأستاذ.")));
-    else if (j.status === "expired") { showCodeBox(); gateMsg("bad", (j.trial ? "⏳ انتهت مدة التجربة المجانية. نتمنى أنها أعجبتك! للاستمرار اشترك:" : "انتهت مدة اشتراكك. للتجديد اشترك ثم أدخل رمز التفعيل الجديد:") + (j.pay ? "\n\n" + j.pay : "") + "\n\n🔑 بعد الدفع سيصلك رمز تفعيل: اكتبه في الخانة أعلاه واضغط دخول.") }
-    else if (j.status === "disabled") gateMsg("bad", "هذا الحساب موقوف. اتصل بأستاذك.");
+    const payTxt = j.pay ? "\n\n" + j.pay : "";
+    if (r.ok && j.token){ setAuth({ token: j.token, nom: j.nom, prenom: "", plan: j.plan || "", until: j.until || null }); gateMsg("ok", "مرحباً بك!"); await loadLessons(); }
+    else if (j.status === "expired") gateMsg("bad", (j.trial ? "⏳ انتهت مدة التجربة المجانية. نتمنى أنها أعجبتك! للاستمرار اشترك:" : "انتهت مدة اشتراكك. للتجديد اشترك واطلب رمزاً جديداً:") + payTxt + "\n\n🔑 بعد الدفع سيصلك رمز تفعيل: اكتبه في الخانة أعلاه واضغط دخول.");
+    else if (j.status === "disabled") gateMsg("bad", "هذا الرمز موقوف. اتصل بأستاذك.");
     else if (j.error === "badcode") gateMsg("bad", "رمز التفعيل غير صحيح. تأكد من كتابته كما وصلك.");
-    else if (j.error === "usedcode") gateMsg("bad", "هذا الرمز استُعمل من قبل. كل رمز صالح لتلميذ واحد فقط.");
-    else if (j.error === "mismatch") gateMsg("bad", "اللقب أو الاسم لا يطابق المعلومات المسجلة بهذا الرقم.");
+    else if (j.error === "devices") gateMsg("bad", "هذا الرمز مستعمل على " + (j.max || 2) + " أجهزة. لا يمكن استعماله على جهاز آخر. اتصل بأستاذك.");
+    else if (j.error === "notrial") gateMsg("wait", "التجربة المجانية غير متاحة حالياً." + payTxt);
     else if (r.status === 429) gateMsg("bad", "محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.");
     else if (r.status === 503) gateMsg("bad", "الخادم غير مُعدّ بعد (قاعدة البيانات). أخبر أستاذك.");
     else gateMsg("bad", "تعذّر الدخول. أعد المحاولة.");
   } catch(err){ gateMsg("bad", "لا يوجد اتصال بالإنترنت."); }
-  $("#gBtn").disabled = false;
+  $("#gBtn").disabled = false; $("#trialBtn").disabled = false;
+}
+$("#loginForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const code = $("#gCode").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length !== 8){ gateMsg("bad", "رمز التفعيل يتكون من 8 حروف وأرقام."); return; }
+  doLogin({ code });
 });
+$("#trialBtn").onclick = () => doLogin({ trial: true });
 $("#logoutBtn").onclick = () => { setAuth(null); READY = {}; stopAll(); $("#lesson").classList.add("hidden"); $("#home").classList.remove("hidden"); showGate(); gateMsg("", ""); };
 loadLessons();
 
@@ -1326,6 +1325,6 @@ function scrollDown(){ board.scrollTop = board.scrollHeight; }
 function showErr(m){ const e = $("#err"); e.textContent = m; e.classList.remove("hidden"); }
 function hideErr(){ $("#err").classList.add("hidden"); }
 </script>
-<div id="appVer" style="position:fixed;bottom:4px;left:8px;font-size:12px;color:#555;background:rgba(255,255,255,.8);border-radius:6px;padding:1px 6px;pointer-events:none;z-index:9999">v2.7</div>
+<div id="appVer" style="position:fixed;bottom:4px;left:8px;font-size:12px;color:#555;background:rgba(255,255,255,.8);border-radius:6px;padding:1px 6px;pointer-events:none;z-index:9999">v3.0</div>
 </body>
 </html>
